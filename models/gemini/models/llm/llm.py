@@ -35,6 +35,7 @@ from dify_plugin.errors.model import (
 from dify_plugin.interfaces.model.large_language_model import LargeLanguageModel
 from google import genai
 from google.genai import errors, types
+from loguru import logger
 
 from .utils import FileCache
 
@@ -108,7 +109,7 @@ class GoogleLargeLanguageModel(LargeLanguageModel):
         return text.rstrip()
 
     @staticmethod
-    def _convert_tools_to_gemini_tool(tools: list[PromptMessageTool]) -> types.Tool:
+    def _convert_to_function_declarations(tools: list[PromptMessageTool]) -> types.Tool:
         """
         Convert tool messages to google-genai's Tool Type.
 
@@ -117,6 +118,7 @@ class GoogleLargeLanguageModel(LargeLanguageModel):
         """
         function_declarations = []
         for tool in tools:
+            logger.debug(f"{tool=}")
             properties = {}
             for key, value in tool.parameters.get("properties", {}).items():
                 property_def = {"type": "STRING", "description": value.get("description", "")}
@@ -368,7 +370,7 @@ class GoogleLargeLanguageModel(LargeLanguageModel):
         *,
         config: types.GenerateContentConfig,
         model_parameters: Mapping[str, Any],
-        tools: List[PromptMessageTool] | None = None,
+        dify_tools: List[PromptMessageTool] | None = None,
     ) -> None:
         config.tools = []
 
@@ -381,8 +383,9 @@ class GoogleLargeLanguageModel(LargeLanguageModel):
         if model_parameters.get("code_execution"):
             config.tools.append(types.Tool(code_execution=types.ToolCodeExecution()))
 
-        if tools:
-            config.tools.append(self._convert_tools_to_gemini_tool(tools))
+        if dify_tools:
+            gemini_function_declarations = self._convert_to_function_declarations(dify_tools)
+            config.tools.append(gemini_function_declarations)
 
     def validate_credentials(self, model: str, credentials: dict) -> None:
         """
@@ -527,9 +530,13 @@ class GoogleLargeLanguageModel(LargeLanguageModel):
         # == ToolUseConfig == #
 
         # Must be executed after `_validate_feature_compatibility`
-        self._set_tool_calling(config=config, model_parameters=model_parameters, tools=tools)
+        self._set_tool_calling(config=config, model_parameters=model_parameters, dify_tools=tools)
 
         # == InvokeModel == #
+        # logger.debug(f"Parameters: {model_parameters=}")
+        logger.debug(f"Tools: {config.tools=}")
+        # logger.debug(f"Invoke: {contents=}")
+        # logger.debug(f"{len(config.tools)=} {len(tools)=}")
 
         if stream:
             response = genai_client.models.generate_content_stream(
