@@ -1,3 +1,4 @@
+import json
 from collections.abc import Generator
 import requests
 import time
@@ -6,6 +7,8 @@ import markdown
 import certifi
 from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse
+
+from loguru import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -129,6 +132,8 @@ class GitLabDataSource(OnlineDocumentDatasource):
     
     def _get_pages(self, datasource_parameters: dict[str, Any]) -> DatasourceGetPagesResponse:
         """获取 GitLab 页面列表（项目、Issues、MRs）"""
+        logger.debug(f"GetPages - {datasource_parameters=}")
+
         access_token = self.runtime.credentials.get("access_token")
         if not access_token:
             raise ValueError("Access token not found in credentials")
@@ -146,7 +151,10 @@ class GitLabDataSource(OnlineDocumentDatasource):
         
         # 获取用户项目
         projects = self._get_projects()
+        print(len(projects))
         for project in projects:
+            logger.debug(f"process project")
+            print(json.dumps(project, indent=2, ensure_ascii=False))
             # 添加项目作为页面
             pages.append({
                 "page_id": f"project:{project['path_with_namespace']}",
@@ -180,6 +188,7 @@ class GitLabDataSource(OnlineDocumentDatasource):
                         "size": readme_info.get('size', 0)
                     }
                 })
+                logger.debug("append README.md")
             except ValueError:
                 pass  # README 不存在
             
@@ -205,6 +214,7 @@ class GitLabDataSource(OnlineDocumentDatasource):
                             "created_at": issue['created_at']
                         }
                     })
+                    logger.debug("append issues")
             except ValueError:
                 pass  # Issues 访问失败
             
@@ -231,6 +241,7 @@ class GitLabDataSource(OnlineDocumentDatasource):
                             "source_branch": mr['source_branch']
                         }
                     })
+                    logger.debug("append merge_requests")
             except ValueError:
                 pass  # MRs 访问失败
         
@@ -241,7 +252,7 @@ class GitLabDataSource(OnlineDocumentDatasource):
             pages=pages,
             total=len(pages),
         )
-        
+        logger.debug("return online document info")
         return DatasourceGetPagesResponse(result=[online_document_info])
     
     def _get_projects(self, max_projects: int = 20) -> List[Dict]:
@@ -257,6 +268,8 @@ class GitLabDataSource(OnlineDocumentDatasource):
     
     def _get_content(self, page: GetOnlineDocumentPageContentRequest) -> Generator[DatasourceMessage, None, None]:
         """获取页面内容"""
+        logger.debug(f"GetContent - {page=}")
+
         access_token = self.runtime.credentials.get("access_token")
         if not access_token:
             raise ValueError("Access token not found in credentials")
@@ -339,7 +352,8 @@ class GitLabDataSource(OnlineDocumentDatasource):
         encoded_file_path = file_path.replace('/', '%2F')
         
         file_info = self._make_request(f"{self.base_url}/projects/{encoded_project}/repository/files/{encoded_file_path}")
-        
+        logger.debug(f"get file content - {json.dumps(file_info, indent=2, ensure_ascii=False)}")
+
         # 获取文件内容
         if file_info.get("encoding") == "base64":
             try:

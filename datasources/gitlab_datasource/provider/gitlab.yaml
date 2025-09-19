@@ -142,7 +142,7 @@ credentials_schema:
       ja_JP: GitLabの「設定」>「アクセストークン」で個人アクセストークンを作成します
       pt_BR: Crie um token de acesso pessoal em Configurações > Tokens de Acesso do GitLab
       zh_Hant: 在 GitLab 設定 > 存取權杖中建立個人存取權杖
-    url: https://gitlab.com/-/profile/personal_access_tokens
+    url: https://gitlab.com/-/user_settings/personal_access_tokens
   - name: gitlab_url
     type: text-input
     required: false
